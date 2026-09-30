@@ -195,8 +195,40 @@
       background: var(--muted);
       flex-shrink: 0;
     }
-    .dot.running { background: var(--success); box-shadow: 0 0 6px var(--success); }
+    .dot.running { background: var(--success); box-shadow: 0 0 8px var(--success); animation: pulse 2s infinite; }
+    .dot.ended   { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
     .dot.idle    { background: var(--muted); }
+
+    @keyframes pulse {
+      0%   { opacity: 1; }
+      50%  { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+
+    .btn-row {
+      display: flex;
+      gap: .8rem;
+      margin-top: .8rem;
+    }
+    .btn-reset {
+      background: rgba(239, 68, 68, .12);
+      border: 1px solid rgba(239, 68, 68, .35);
+      color: #fca5a5;
+    }
+    .btn-reset:hover {
+      background: rgba(239, 68, 68, .25);
+      border-color: var(--danger);
+      color: #fff;
+    }
+    .btn-launch {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(16, 185, 129, .4);
+      margin-top: .6rem;
+    }
+    .btn-launch:hover {
+      box-shadow: 0 0 30px rgba(16, 185, 129, .6);
+    }
   </style>
 </head>
 <body>
@@ -252,6 +284,10 @@
     </div>
 
     <button class="btn btn-primary" id="save-btn" onclick="doSave()">Save Settings</button>
+    <button class="btn btn-launch"  id="start-btn-admin" onclick="doStart()">Launch Timer Now ⚡</button>
+    <div class="btn-row">
+      <button class="btn btn-reset" id="reset-btn" onclick="doReset()">Reset Timer</button>
+    </div>
     <button class="btn btn-ghost"   id="logout-btn" onclick="doLogout()">Log Out</button>
   </div>
 </div>
@@ -301,11 +337,25 @@
     }
   });
 
+  let currentState = null;
+  let tickTimer    = null;
+  let pollTimer    = null;
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function msToHMS(ms) {
+    const t = Math.max(0, Math.floor(ms / 1000));
+    return pad(Math.floor(t / 3600)) + ':' + pad(Math.floor((t % 3600) / 60)) + ':' + pad(t % 60);
+  }
+
   // ── Show settings panel & load current state ──────────────────────────────
   async function showSettings() {
     document.getElementById('login-panel').style.display    = 'none';
     document.getElementById('settings-panel').style.display = 'block';
     await loadState();
+
+    if (!tickTimer) tickTimer = setInterval(renderStatus, 1000);
+    if (!pollTimer) pollTimer = setInterval(loadState, 4000);
   }
 
   async function loadState() {
@@ -318,41 +368,89 @@
     }
   }
 
-  function applyState(state) {
+  function renderStatus() {
+    if (!currentState) return;
     const dot      = document.getElementById('status-dot');
     const statusTx = document.getElementById('status-text');
     const saveBtn  = document.getElementById('save-btn');
+    const startBtn = document.getElementById('start-btn-admin');
     const infoEl   = document.getElementById('settings-info');
+    const resetBtn = document.getElementById('reset-btn');
+    const hoursEl  = document.getElementById('hours');
+    const minEl    = document.getElementById('minutes');
+    const nameEl   = document.getElementById('hack-name');
 
-    document.getElementById('hack-name').value = state.name || '';
+    const now = Date.now();
+    const isRunning = !!(currentState.started && currentState.endTime && now < currentState.endTime);
+    const isEnded   = !!(currentState.started && currentState.endTime && now >= currentState.endTime);
 
-    if (state.durationMs) {
-      const totalMin = Math.floor(state.durationMs / 60000);
-      document.getElementById('hours').value   = Math.floor(totalMin / 60);
-      document.getElementById('minutes').value = totalMin % 60;
-    }
-
-    if (state.started) {
-      dot.className   = 'dot running';
-      statusTx.textContent = 'Timer is RUNNING';
+    if (isRunning) {
+      const rem = Math.max(0, currentState.endTime - now);
+      dot.className = 'dot running';
+      statusTx.textContent = 'Timer is RUNNING (' + msToHMS(rem) + ' remaining)';
       saveBtn.disabled = true;
-      document.getElementById('hours').disabled   = true;
-      document.getElementById('minutes').disabled = true;
-      show(infoEl, 'info', 'Timer has started. Duration can no longer be changed.');
+      if (startBtn) {
+        startBtn.disabled = true;
+        startBtn.textContent = 'Timer Running ⏱';
+      }
+      hoursEl.disabled = true;
+      minEl.disabled = true;
+      nameEl.disabled = true;
+      resetBtn.disabled = false;
+      show(infoEl, 'info', 'Timer is currently running (' + msToHMS(rem) + ' left). Click "Reset Timer" if you need to stop or change duration.');
+    } else if (isEnded) {
+      dot.className = 'dot ended';
+      statusTx.textContent = "TIME'S UP! (Completed)";
+      saveBtn.disabled = false;
+      if (startBtn) {
+        startBtn.disabled = false;
+        startBtn.textContent = 'Launch Timer Now ⚡';
+      }
+      hoursEl.disabled = false;
+      minEl.disabled = false;
+      nameEl.disabled = false;
+      resetBtn.disabled = false;
+      show(infoEl, 'info', "Countdown has ended (Time's Up). You can edit duration or name and click 'Launch Timer Now ⚡' or 'Save Settings'.");
     } else {
-      dot.className   = 'dot idle';
+      dot.className = 'dot idle';
       statusTx.textContent = 'Timer not started';
       saveBtn.disabled = false;
-      document.getElementById('hours').disabled   = false;
-      document.getElementById('minutes').disabled = false;
+      if (startBtn) {
+        startBtn.disabled = false;
+        startBtn.textContent = 'Launch Timer Now ⚡';
+      }
+      hoursEl.disabled = false;
+      minEl.disabled = false;
+      nameEl.disabled = false;
+      resetBtn.disabled = true;
       hide(infoEl);
     }
   }
 
+  function applyState(state) {
+    currentState = state;
+
+    const nameInput    = document.getElementById('hack-name');
+    const hoursInput   = document.getElementById('hours');
+    const minutesInput = document.getElementById('minutes');
+
+    if (document.activeElement !== nameInput) {
+      nameInput.value = state.name || '';
+    }
+
+    if (state.durationMs && document.activeElement !== hoursInput && document.activeElement !== minutesInput) {
+      const totalMin = Math.floor(state.durationMs / 60000);
+      hoursInput.value   = Math.floor(totalMin / 60);
+      minutesInput.value = totalMin % 60;
+    }
+
+    renderStatus();
+  }
+
   // ── Save ─────────────────────────────────────────────────────────────────
   async function doSave() {
-    const errEl  = document.getElementById('settings-err');
-    const okEl   = document.getElementById('settings-ok');
+    const errEl   = document.getElementById('settings-err');
+    const okEl    = document.getElementById('settings-ok');
     const saveBtn = document.getElementById('save-btn');
 
     hide(errEl); hide(okEl);
@@ -372,7 +470,7 @@
       });
       const data = await res.json();
       if (res.ok) {
-        show(okEl, 'success', 'Settings saved!');
+        show(okEl, 'success', 'Settings saved! Timer is ready to launch.');
         applyState(data.data);
       } else {
         show(errEl, 'error', data.error || 'Save failed.');
@@ -384,8 +482,86 @@
     }
   }
 
+  // ── Launch Timer ─────────────────────────────────────────────────────────
+  async function doStart() {
+    const errEl    = document.getElementById('settings-err');
+    const okEl     = document.getElementById('settings-ok');
+    const startBtn = document.getElementById('start-btn-admin');
+    hide(errEl); hide(okEl);
+
+    const body = {
+      name:    document.getElementById('hack-name').value.trim(),
+      hours:   document.getElementById('hours').value,
+      minutes: document.getElementById('minutes').value,
+    };
+
+    if (startBtn) startBtn.disabled = true;
+
+    try {
+      // Save settings first to ensure entered duration is active
+      const saveRes = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!saveRes.ok) {
+        const saveErr = await saveRes.json();
+        show(errEl, 'error', saveErr.error || 'Could not save settings.');
+        if (startBtn) startBtn.disabled = false;
+        return;
+      }
+
+      // Start the timer
+      const startRes = await fetch('/api/start', { method: 'POST' });
+      const data = await startRes.json();
+      if (startRes.ok) {
+        show(okEl, 'success', 'Timer started and running!');
+        applyState(data.data);
+      } else {
+        show(errEl, 'error', data.error || 'Could not start timer.');
+        if (startBtn) startBtn.disabled = false;
+      }
+    } catch {
+      show(errEl, 'error', 'Server unreachable.');
+      if (startBtn) startBtn.disabled = false;
+    }
+  }
+
+  // ── Reset ────────────────────────────────────────────────────────────────
+  async function doReset() {
+    const now = Date.now();
+    const isRunning = currentState && currentState.started && currentState.endTime && now < currentState.endTime;
+    if (isRunning && !confirm('The timer is currently running. Are you sure you want to stop and reset it?')) {
+      return;
+    }
+
+    const errEl    = document.getElementById('settings-err');
+    const okEl     = document.getElementById('settings-ok');
+    const resetBtn = document.getElementById('reset-btn');
+
+    hide(errEl); hide(okEl);
+    resetBtn.disabled = true;
+
+    try {
+      const res  = await fetch('/api/reset', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        show(okEl, 'success', 'Timer reset successfully!');
+        applyState(data.data);
+      } else {
+        show(errEl, 'error', data.error || 'Reset failed.');
+        resetBtn.disabled = false;
+      }
+    } catch {
+      show(errEl, 'error', 'Server unreachable.');
+      resetBtn.disabled = false;
+    }
+  }
+
   // ── Logout ───────────────────────────────────────────────────────────────
   async function doLogout() {
+    if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
     await fetch('/api/logout', { method: 'POST' });
     document.getElementById('settings-panel').style.display = 'none';
     document.getElementById('login-panel').style.display    = 'block';

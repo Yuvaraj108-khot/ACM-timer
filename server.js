@@ -20,6 +20,15 @@ app.use(session({
   saveUninitialized: false,
   cookie: { maxAge: 8 * 60 * 60 * 1000 } // 8 hours
 }));
+
+// Disable caching for real-time timer state & pages
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -71,14 +80,28 @@ app.get('/api/auth-check', (req, res) => {
 
 // ── API: hackathon state ──────────────────────────────────────────────────────
 app.get('/api/state', (req, res) => {
-  res.json(readData());
+  const data = readData();
+  const now = Date.now();
+  const isRunning = !!(data.started && data.endTime && now < data.endTime);
+  const isEnded = !!(data.started && data.endTime && now >= data.endTime);
+  const remainingMs = data.endTime ? Math.max(0, data.endTime - now) : (data.durationMs || 0);
+
+  res.json({
+    ...data,
+    status: isRunning ? 'running' : (isEnded ? 'ended' : 'idle'),
+    isRunning,
+    isEnded,
+    remainingMs
+  });
 });
 
-// Save name + duration (admin only, only allowed before timer starts)
+// Save name + duration (admin only, allowed when idle or ended)
 app.post('/api/settings', requireAuth, (req, res) => {
   const data = readData();
-  if (data.started) {
-    return res.status(400).json({ error: 'Timer already started; cannot change duration.' });
+  const now = Date.now();
+  const isRunning = !!(data.started && data.endTime && now < data.endTime);
+  if (isRunning) {
+    return res.status(400).json({ error: 'Timer is currently running; reset before changing duration.' });
   }
   const { name, hours, minutes } = req.body;
   if (typeof name !== 'string' || name.trim() === '') {
@@ -97,10 +120,12 @@ app.post('/api/settings', requireAuth, (req, res) => {
   res.json({ ok: true, data });
 });
 
-// Start the timer (idempotent - only first press counts)
+// Start the timer (idempotent if already actively running)
 app.post('/api/start', (req, res) => {
   const data = readData();
-  if (data.started) {
+  const now = Date.now();
+  const isRunning = !!(data.started && data.endTime && now < data.endTime);
+  if (isRunning) {
     return res.json({ ok: true, alreadyStarted: true, data });
   }
   if (!data.durationMs || data.durationMs <= 0) {
@@ -108,6 +133,15 @@ app.post('/api/start', (req, res) => {
   }
   data.started = true;
   data.endTime = Date.now() + data.durationMs;
+  writeData(data);
+  res.json({ ok: true, data });
+});
+
+// Reset the timer (admin only)
+app.post('/api/reset', requireAuth, (req, res) => {
+  const data = readData();
+  data.started = false;
+  data.endTime = null;
   writeData(data);
   res.json({ ok: true, data });
 });

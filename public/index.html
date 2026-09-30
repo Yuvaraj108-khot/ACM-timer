@@ -589,18 +589,26 @@
     }
 
     function tick() {
+      if (!endTime) return;
       const rem = endTime - Date.now();
       if (rem <= 0) {
         countdown.style.display = 'none';
         timesUp.style.display = 'block';
-        clearInterval(tickInterval);
-        clearInterval(pollInterval);
+        if (tickInterval) {
+          clearInterval(tickInterval);
+          tickInterval = null;
+        }
       } else {
         countdown.textContent = msToHMS(rem);
       }
     }
 
     function applyState(state) {
+      if (state.name) {
+        const brandMain = document.querySelector('.brand-main');
+        if (brandMain) brandMain.textContent = state.name;
+      }
+
       if (state.started && state.endTime) {
         endTime = state.endTime;
         preStart.style.display = 'none';
@@ -610,8 +618,10 @@
         if (rem <= 0) {
           countdown.style.display = 'none';
           timesUp.style.display = 'block';
-          clearInterval(tickInterval);
-          clearInterval(pollInterval);
+          if (tickInterval) {
+            clearInterval(tickInterval);
+            tickInterval = null;
+          }
         } else {
           countdown.style.display = 'block';
           timesUp.style.display = 'none';
@@ -619,8 +629,19 @@
           if (!tickInterval) tickInterval = setInterval(tick, 1000);
         }
       } else {
-        preStart.style.display = 'flex';
+        if (tickInterval) {
+          clearInterval(tickInterval);
+          tickInterval = null;
+        }
+        endTime = null;
         timerDiv.style.display = 'none';
+        preStart.style.display = 'flex';
+        countdown.style.display = 'block';
+        timesUp.style.display = 'none';
+        startBtn.disabled = false;
+        const btnLabel = startBtn.querySelector('.btn-label');
+        if (btnLabel) btnLabel.textContent = 'LAUNCH';
+
         if (state.durationMs) {
           durationHint.innerHTML = 'Duration: <span class="val">' + fmtDuration(state.durationMs) + '</span>';
         } else {
@@ -658,7 +679,7 @@
     });
 
     poll();
-    pollInterval = setInterval(poll, 5000);
+    pollInterval = setInterval(poll, 2000);
   </script>
 </body>
 
