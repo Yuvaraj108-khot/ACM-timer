@@ -8,8 +8,8 @@ const PORT = 3000;
 const DATA_FILE = path.join(__dirname, 'data.json');
 
 // ── Admin credentials (change here) ──────────────────────────────────────────
-const ADMIN_EMAIL    = 'admin@hack.com';
-const ADMIN_PASSWORD = 'admin123';
+const ADMIN_EMAIL    = 'yuvarajkhot2005@gmail.com';
+const ADMIN_PASSWORD = 'YRk@2005';
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(express.json());
