@@ -301,6 +301,15 @@
   }
   function hide(el) { el.style.display = 'none'; }
 
+  function authHeaders(extra = {}) {
+    const headers = { 'Content-Type': 'application/json', ...extra };
+    const token = localStorage.getItem('acm_admin_token');
+    if (token) {
+      headers['Authorization'] = 'Bearer ' + token;
+    }
+    return headers;
+  }
+
   // ── Login ────────────────────────────────────────────────────────────────
   async function doLogin() {
     const email    = document.getElementById('email').value.trim();
@@ -325,6 +334,9 @@
       });
       const body = await res.json();
       if (res.ok) {
+        if (body.token) {
+          localStorage.setItem('acm_admin_token', body.token);
+        }
         showSettings();
       } else {
         show(errEl, 'error', body.error || 'Invalid credentials.');
@@ -471,10 +483,11 @@
     try {
       const res  = await fetch('/api/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify(body)
       });
       if (res.status === 401) {
+        localStorage.removeItem('acm_admin_token');
         alert('Session expired. Please log in again.');
         doLogout();
         return;
@@ -512,10 +525,11 @@
       // Save settings first to ensure entered duration is active
       const saveRes = await fetch('/api/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify(body)
       });
       if (saveRes.status === 401) {
+        localStorage.removeItem('acm_admin_token');
         alert('Session expired. Please log in again.');
         doLogout();
         return;
@@ -528,7 +542,10 @@
       }
 
       // Start the timer
-      const startRes = await fetch('/api/start', { method: 'POST' });
+      const startRes = await fetch('/api/start', {
+        method: 'POST',
+        headers: authHeaders()
+      });
       const data = await startRes.json();
       if (startRes.ok) {
         show(okEl, 'success', 'Timer started and running!');
@@ -559,8 +576,12 @@
     resetBtn.disabled = true;
 
     try {
-      const res  = await fetch('/api/reset', { method: 'POST' });
+      const res  = await fetch('/api/reset', {
+        method: 'POST',
+        headers: authHeaders()
+      });
       if (res.status === 401) {
+        localStorage.removeItem('acm_admin_token');
         alert('Session expired. Please log in again.');
         doLogout();
         return;
@@ -583,7 +604,10 @@
   async function doLogout() {
     if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-    await fetch('/api/logout', { method: 'POST' });
+    try {
+      await fetch('/api/logout', { method: 'POST', headers: authHeaders() });
+    } catch { }
+    localStorage.removeItem('acm_admin_token');
     document.getElementById('settings-panel').style.display = 'none';
     document.getElementById('login-panel').style.display    = 'block';
     document.getElementById('login-btn').disabled = false;
@@ -593,9 +617,15 @@
   // ── Auto-check session on page load ──────────────────────────────────────
   (async () => {
     try {
-      const res  = await fetch('/api/auth-check');
+      const res  = await fetch('/api/auth-check', { headers: authHeaders() });
       const data = await res.json();
-      if (data.authenticated) showSettings();
+      if (data.authenticated) {
+        showSettings();
+      } else {
+        localStorage.removeItem('acm_admin_token');
+        document.getElementById('settings-panel').style.display = 'none';
+        document.getElementById('login-panel').style.display    = 'block';
+      }
     } catch { /* not logged in */ }
   })();
 </script>

@@ -64,9 +64,45 @@ function writeData(data) {
   }
 }
 
+function checkCredentials(email, password) {
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanPass  = (password || '').trim();
+
+  const isPrimary  = cleanEmail === 'yuvarajkhot2005@gmail.com' && cleanPass === 'YRk@2005';
+  const isFallback = cleanEmail === 'admin@hack.com' && cleanPass === 'admin123';
+  const isEnv      = !!(process.env.ADMIN_EMAIL && cleanEmail === process.env.ADMIN_EMAIL.trim().toLowerCase() && cleanPass === (process.env.ADMIN_PASSWORD || '').trim());
+
+  return isPrimary || isFallback || isEnv;
+}
+
+function isValidToken(token) {
+  if (!token) return false;
+  try {
+    const decoded = Buffer.from(token, 'base64').toString('utf8');
+    const colonIdx = decoded.indexOf(':');
+    if (colonIdx === -1) return false;
+    const email = decoded.substring(0, colonIdx);
+    const pass = decoded.substring(colonIdx + 1);
+    return checkCredentials(email, pass);
+  } catch {
+    return false;
+  }
+}
+
 function requireAuth(req, res, next) {
+  // Check session
   if (req.session && req.session.authenticated) return next();
-  res.status(401).json({ error: 'Unauthorized' });
+
+  // Check Bearer / custom token header
+  const authHeader = req.headers['authorization'] || req.headers['x-admin-token'];
+  const token = authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : '';
+
+  if (token && isValidToken(token)) {
+    if (req.session) req.session.authenticated = true;
+    return next();
+  }
+
+  res.status(401).json({ error: 'Unauthorized. Please log in.' });
 }
 
 // ── Page routes ───────────────────────────────────────────────────────────────
@@ -81,31 +117,38 @@ app.get('/admin', (req, res) => {
 // ── API: admin auth ───────────────────────────────────────────────────────────
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body || {};
-  const cleanEmail = (email || '').trim().toLowerCase();
-  const cleanPass  = (password || '').trim();
+  if (checkCredentials(email, password)) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPass  = (password || '').trim();
+    const token = Buffer.from(cleanEmail + ':' + cleanPass).toString('base64');
 
-  const isPrimary  = cleanEmail === 'yuvarajkhot2005@gmail.com' && cleanPass === 'YRk@2005';
-  const isFallback = cleanEmail === 'admin@hack.com' && cleanPass === 'admin123';
-  const isEnv      = !!(process.env.ADMIN_EMAIL && cleanEmail === process.env.ADMIN_EMAIL.trim().toLowerCase() && cleanPass === (process.env.ADMIN_PASSWORD || '').trim());
+    if (req.session) {
+      req.session.authenticated = true;
+      req.session.save(() => {});
+    }
 
-  if (isPrimary || isFallback || isEnv) {
-    req.session.authenticated = true;
-    req.session.save((err) => {
-      if (err) return res.status(500).json({ error: 'Session save error' });
-      res.json({ ok: true });
-    });
+    res.json({ ok: true, token });
   } else {
     res.status(401).json({ error: 'Invalid email or password.' });
   }
 });
 
 app.post('/api/logout', (req, res) => {
-  req.session.destroy();
+  if (req.session) req.session.destroy(() => {});
   res.json({ ok: true });
 });
 
 app.get('/api/auth-check', (req, res) => {
-  res.json({ authenticated: !!(req.session && req.session.authenticated) });
+  if (req.session && req.session.authenticated) {
+    return res.json({ authenticated: true });
+  }
+  const authHeader = req.headers['authorization'] || req.headers['x-admin-token'];
+  const token = authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : '';
+  if (token && isValidToken(token)) {
+    if (req.session) req.session.authenticated = true;
+    return res.json({ authenticated: true });
+  }
+  res.json({ authenticated: false });
 });
 
 // ── API: hackathon state ──────────────────────────────────────────────────────
