@@ -242,7 +242,7 @@
     <div id="login-err" class="msg error"></div>
 
     <label for="email">Email</label>
-    <input type="email" id="email" placeholder="yuvarajkhot2005@gmail.com" autocomplete="username" />
+    <input type="email" id="email" value="yuvarajkhot2005@gmail.com" placeholder="yuvarajkhot2005@gmail.com" autocomplete="username" />
 
     <label for="password">Password</label>
     <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" />
@@ -304,11 +304,17 @@
   // ── Login ────────────────────────────────────────────────────────────────
   async function doLogin() {
     const email    = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
+    const password = document.getElementById('password').value.trim();
     const errEl    = document.getElementById('login-err');
     const btn      = document.getElementById('login-btn');
 
     hide(errEl);
+
+    if (!email || !password) {
+      show(errEl, 'error', 'Please enter your password.');
+      return;
+    }
+
     btn.disabled = true;
 
     try {
@@ -321,7 +327,7 @@
       if (res.ok) {
         showSettings();
       } else {
-        show(errEl, 'error', body.error || 'Login failed.');
+        show(errEl, 'error', body.error || 'Invalid credentials.');
         btn.disabled = false;
       }
     } catch {
@@ -468,6 +474,11 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
+      if (res.status === 401) {
+        alert('Session expired. Please log in again.');
+        doLogout();
+        return;
+      }
       const data = await res.json();
       if (res.ok) {
         show(okEl, 'success', 'Settings saved! Timer is ready to launch.');
@@ -504,6 +515,11 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
+      if (saveRes.status === 401) {
+        alert('Session expired. Please log in again.');
+        doLogout();
+        return;
+      }
       if (!saveRes.ok) {
         const saveErr = await saveRes.json();
         show(errEl, 'error', saveErr.error || 'Could not save settings.');
@@ -544,6 +560,11 @@
 
     try {
       const res  = await fetch('/api/reset', { method: 'POST' });
+      if (res.status === 401) {
+        alert('Session expired. Please log in again.');
+        doLogout();
+        return;
+      }
       const data = await res.json();
       if (res.ok) {
         show(okEl, 'success', 'Timer reset successfully!');
