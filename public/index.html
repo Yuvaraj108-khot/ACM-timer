@@ -25,10 +25,11 @@
 
     html,
     body {
-      height: 100%;
+      min-height: 100vh;
+      min-height: 100dvh;
       font-family: 'Inter', sans-serif;
       background: #04030e;
-      overflow: hidden;
+      overflow-x: hidden;
       color: #fff;
     }
 
@@ -57,20 +58,25 @@
       position: relative;
       z-index: 2;
       height: 100vh;
+      height: 100dvh;
+      width: 100%;
+      max-width: 100vw;
       display: flex;
       flex-direction: column;
       align-items: center;
+      padding: 0 1rem;
     }
 
     /* ── TOP BAR ───────────────────────────────────────────────────── */
     #topbar {
       display: flex;
       align-items: center;
-      gap: 1.1rem;
-      padding: 1.4rem 2.4rem;
+      gap: clamp(0.5rem, 2vw, 1.1rem);
+      padding: clamp(0.6rem, 2vw, 1.2rem) clamp(1rem, 4vw, 2.2rem);
       animation: fadeDown .65s ease both;
       /* glass pill */
-      margin-top: 1rem;
+      margin-top: clamp(0.5rem, 2.5vh, 1.2rem);
+      max-width: min(92vw, 640px);
       background: rgba(255, 255, 255, .07);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
@@ -87,40 +93,47 @@
       display: flex;
       align-items: center;
       box-shadow: 0 0 18px rgba(124, 58, 237, .55);
+      flex-shrink: 0;
     }
 
     .logo-badge img {
-      height: 38px;
+      height: clamp(26px, 5vw, 38px);
       width: auto;
       display: block;
     }
 
     .divider {
       width: 1px;
-      height: 38px;
+      height: clamp(26px, 5vw, 38px);
       background: rgba(255, 255, 255, .22);
+      flex-shrink: 0;
     }
 
     .brand {
       display: flex;
       flex-direction: column;
       line-height: 1.15;
+      min-width: 0;
     }
 
     .brand-main {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 2rem;
+      font-size: clamp(1.3rem, 4.5vw, 2rem);
       letter-spacing: .12em;
       color: #fff;
       text-shadow: 0 0 20px rgba(168, 85, 247, .75);
+      white-space: nowrap;
     }
 
     .brand-sub {
-      font-size: .72rem;
+      font-size: clamp(0.55rem, 1.8vw, 0.72rem);
       font-weight: 700;
-      letter-spacing: .2em;
+      letter-spacing: clamp(0.08em, 0.4vw, 0.2em);
       text-transform: uppercase;
       color: var(--violet);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
 
@@ -129,8 +142,8 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 1.6rem;
-      padding-top: 2rem;
+      gap: clamp(1rem, 3vh, 1.6rem);
+      padding-top: clamp(1rem, 4vh, 2rem);
       margin-bottom: auto;
       opacity: 0;
       animation: fadeUp .7s ease both .6s;
@@ -142,8 +155,11 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 220px;
-      height: 220px;
+      width: min(220px, 52vw);
+      height: min(220px, 52vw);
+      max-width: 220px;
+      max-height: 220px;
+      aspect-ratio: 1;
     }
 
     /* spinning gradient ring */
@@ -210,8 +226,11 @@
     #start-btn {
       position: relative;
       z-index: 2;
-      width: 200px;
-      height: 200px;
+      width: min(200px, 47vw);
+      height: min(200px, 47vw);
+      max-width: 200px;
+      max-height: 200px;
+      aspect-ratio: 1;
       border-radius: 50%;
       border: none;
       background: radial-gradient(circle at 35% 35%,
@@ -244,14 +263,14 @@
     }
 
     .btn-icon {
-      font-size: 2.8rem;
+      font-size: clamp(1.8rem, 6vw, 2.8rem);
       line-height: 1;
       filter: drop-shadow(0 0 10px rgba(255, 255, 255, .5));
     }
 
     .btn-label {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 1.55rem;
+      font-size: clamp(1rem, 3.6vw, 1.55rem);
       letter-spacing: .22em;
       color: #fff;
       text-shadow: 0 0 12px rgba(255, 255, 255, .4);
@@ -259,9 +278,10 @@
 
     /* duration hint */
     .duration-hint {
-      font-size: .88rem;
+      font-size: clamp(0.78rem, 2.2vw, 0.88rem);
       color: rgba(255, 255, 255, .5);
       letter-spacing: .07em;
+      text-align: center;
     }
 
     .duration-hint .val {
@@ -278,18 +298,23 @@
       display: none;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       gap: .5rem;
       margin-top: auto;
       margin-bottom: auto;
       padding-top: .8rem;
+      width: 100%;
     }
 
     #countdown {
       font-family: 'JetBrains Mono', monospace;
-      font-size: clamp(5rem, 19vw, 14rem);
+      font-size: clamp(2.4rem, 13.5vw, 14rem);
       font-weight: 800;
       line-height: 1;
       letter-spacing: -.02em;
+      white-space: nowrap;
+      text-align: center;
+      max-width: 100vw;
       background: linear-gradient(160deg,
           #fff 0%,
           #e9d5ff 40%,
@@ -305,8 +330,11 @@
     #times-up {
       display: none;
       font-family: 'Bebas Neue', sans-serif;
-      font-size: clamp(4rem, 14vw, 11rem);
+      font-size: clamp(2.5rem, 12vw, 11rem);
       letter-spacing: .1em;
+      white-space: nowrap;
+      text-align: center;
+      max-width: 100vw;
       background: linear-gradient(135deg, #f87171, #fb923c);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -319,11 +347,46 @@
     #bottombar {
       width: 100%;
       text-align: center;
-      padding: 1rem 2rem;
-      font-size: .72rem;
+      padding: clamp(0.6rem, 2vh, 1rem) 1rem;
+      font-size: clamp(0.6rem, 1.8vw, 0.72rem);
       letter-spacing: .14em;
       text-transform: uppercase;
       color: rgba(255, 255, 255, .28);
+    }
+
+    /* ── MEDIA QUERIES ─────────────────────────────────────────────── */
+    @media (max-width: 480px) {
+      #topbar {
+        border-radius: 16px;
+      }
+      .brand-sub {
+        letter-spacing: .08em;
+      }
+    }
+
+    @media (max-height: 520px) and (orientation: landscape) {
+      #topbar {
+        margin-top: .3rem;
+        padding: .4rem 1rem;
+      }
+      #pre-start {
+        padding-top: .5rem;
+        gap: .6rem;
+      }
+      .launch-wrap {
+        width: 130px;
+        height: 130px;
+      }
+      #start-btn {
+        width: 115px;
+        height: 115px;
+      }
+      .btn-icon {
+        font-size: 1.4rem;
+      }
+      .btn-label {
+        font-size: .9rem;
+      }
     }
 
     /* ── KEYFRAMES ─────────────────────────────────────────────────── */
