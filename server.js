@@ -4,8 +4,10 @@ const path = require('path');
 const session = require('express-session');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data.json');
+
+app.set('trust proxy', 1);
 
 // ── Admin credentials (change here) ──────────────────────────────────────────
 const ADMIN_EMAIL    = 'yuvarajkhot2005@gmail.com';
@@ -15,7 +17,7 @@ const ADMIN_PASSWORD = 'YRk@2005';
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-  secret: 'hackathon-secret-key',
+  secret: process.env.SESSION_SECRET || 'hackathon-secret-key',
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 8 * 60 * 60 * 1000 } // 8 hours
@@ -32,16 +34,29 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+let inMemoryData = null;
+
 function readData() {
+  if (inMemoryData) return inMemoryData;
   try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-  } catch {
-    return { name: 'Hackathon', durationMs: 0, endTime: null, started: false };
+    if (fs.existsSync(DATA_FILE)) {
+      inMemoryData = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+      return inMemoryData;
+    }
+  } catch (err) {
+    console.error('Error reading data file, using memory fallback:', err.message);
   }
+  inMemoryData = { name: 'Hackathon', durationMs: 0, endTime: null, started: false };
+  return inMemoryData;
 }
 
 function writeData(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  inMemoryData = data;
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.warn('Warning: Could not write data to disk (saved in memory):', err.message);
+  }
 }
 
 function requireAuth(req, res, next) {
@@ -60,7 +75,7 @@ app.get('/admin', (req, res) => {
 
 // ── API: admin auth ───────────────────────────────────────────────────────────
 app.post('/api/login', (req, res) => {
-  const { email, password } = req.body;
+  const { email, password } = req.body || {};
   if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
     req.session.authenticated = true;
     res.json({ ok: true });
@@ -103,7 +118,7 @@ app.post('/api/settings', requireAuth, (req, res) => {
   if (isRunning) {
     return res.status(400).json({ error: 'Timer is currently running; reset before changing duration.' });
   }
-  const { name, hours, minutes } = req.body;
+  const { name, hours, minutes } = req.body || {};
   if (typeof name !== 'string' || name.trim() === '') {
     return res.status(400).json({ error: 'Name is required.' });
   }
@@ -144,6 +159,12 @@ app.post('/api/reset', requireAuth, (req, res) => {
   data.endTime = null;
   writeData(data);
   res.json({ ok: true, data });
+});
+
+// ── Error handling ────────────────────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error(`[Error ${req.method} ${req.url}]:`, err);
+  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
 // ── Start server ──────────────────────────────────────────────────────────────
