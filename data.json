@@ -1,6 +1,6 @@
 {
   "name": "Hackathon",
-  "durationMs": 600000,
+  "durationMs": 21600000,
   "endTime": null,
   "started": false
 }
