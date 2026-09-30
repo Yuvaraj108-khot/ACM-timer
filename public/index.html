@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hackathon Timer</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0a0a0f;
+      --surface: #11111a;
+      --accent:  #7c3aed;
+      --accent2: #a855f7;
+      --text:    #f0f0f8;
+      --muted:   #6b7280;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    /* ── Full-screen background image ─────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: url('/bg.jpg') center center / cover no-repeat;
+      filter: brightness(.75) saturate(1.05);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ── Glass card wraps all UI ──────────────────────────────────── */
+    #ui-card {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2rem;
+      padding: 2.8rem 3.6rem;
+      border-radius: 1.6rem;
+      background: rgba(8, 6, 18, 0.55);
+      backdrop-filter: blur(18px) saturate(1.4);
+      -webkit-backdrop-filter: blur(18px) saturate(1.4);
+      border: 1px solid rgba(168, 85, 247, 0.18);
+      box-shadow: 0 8px 40px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.07);
+    }
+
+    #hackathon-name {
+      font-size: clamp(1.2rem, 4vw, 2.2rem);
+      font-weight: 700;
+      letter-spacing: .04em;
+      color: var(--text);
+      margin-bottom: 0;
+      opacity: 0;
+      animation: fadeUp .6s ease forwards .1s;
+    }
+
+    /* ── Start button ─────────────────────────────────────────────────── */
+    #start-btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 9999px;
+      padding: .9rem 3.2rem;
+      cursor: pointer;
+      box-shadow: 0 0 32px rgba(124,58,237,.5);
+      transition: transform .15s ease, box-shadow .15s ease;
+      opacity: 0;
+      animation: fadeUp .6s ease forwards .3s;
+      margin-top: .5rem;
+    }
+    #start-btn:hover { transform: scale(1.06); box-shadow: 0 0 48px rgba(168,85,247,.7); }
+    #start-btn:active { transform: scale(.97); }
+
+    /* ── Countdown ────────────────────────────────────────────────────── */
+    #timer-display {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.2rem;
+    }
+
+    #countdown {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(4rem, 18vw, 14rem);
+      font-weight: 700;
+      line-height: 1;
+      background: linear-gradient(135deg, #fff 30%, var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -.02em;
+      text-shadow: none;
+      filter: drop-shadow(0 0 40px rgba(168,85,247,.35));
+      animation: fadeUp .5s ease forwards;
+    }
+
+    #times-up {
+      display: none;
+      font-size: clamp(3rem, 12vw, 9rem);
+      font-weight: 900;
+      letter-spacing: .06em;
+      background: linear-gradient(135deg, #f87171, #fb923c);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 40px rgba(248,113,113,.4));
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    /* ── Animations ───────────────────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: .75; transform: scale(1.04); }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="ui-card">
+    <div id="hackathon-name">Loading…</div>
+
+    <button id="start-btn">&#9654; Start Timer</button>
+
+    <div id="timer-display">
+      <div id="countdown">00:00:00</div>
+      <div id="times-up">TIME'S UP!</div>
+    </div>
+  </div>
+
+  <script>
+    const nameEl     = document.getElementById('hackathon-name');
+    const startBtn   = document.getElementById('start-btn');
+    const timerDiv   = document.getElementById('timer-display');
+    const countdown  = document.getElementById('countdown');
+    const timesUp    = document.getElementById('times-up');
+
+    let endTime      = null;
+    let tickInterval = null;
+    let pollInterval = null;
+
+    // ── Formatting ──────────────────────────────────────────────────────
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function msToHMS(ms) {
+      const total = Math.max(0, Math.floor(ms / 1000));
+      const h = Math.floor(total / 3600);
+      const m = Math.floor((total % 3600) / 60);
+      const s = total % 60;
+      return pad(h) + ':' + pad(m) + ':' + pad(s);
+    }
+
+    // ── Tick ────────────────────────────────────────────────────────────
+    function tick() {
+      const remaining = endTime - Date.now();
+      if (remaining <= 0) {
+        countdown.style.display = 'none';
+        timesUp.style.display   = 'block';
+        clearInterval(tickInterval);
+        clearInterval(pollInterval);
+      } else {
+        countdown.textContent = msToHMS(remaining);
+      }
+    }
+
+    // ── Render state from server ─────────────────────────────────────────
+    function applyState(state) {
+      nameEl.textContent = state.name || 'Hackathon';
+
+      if (state.started && state.endTime) {
+        endTime = state.endTime;
+        startBtn.style.display  = 'none';
+        timerDiv.style.display  = 'flex';
+
+        const remaining = endTime - Date.now();
+        if (remaining <= 0) {
+          countdown.style.display = 'none';
+          timesUp.style.display   = 'block';
+          clearInterval(tickInterval);
+          clearInterval(pollInterval);
+        } else {
+          countdown.style.display = 'block';
+          timesUp.style.display   = 'none';
+          countdown.textContent   = msToHMS(remaining);
+          if (!tickInterval) {
+            tickInterval = setInterval(tick, 1000);
+          }
+        }
+      } else {
+        // Not started yet – show button
+        startBtn.style.display = '';
+        timerDiv.style.display = 'none';
+      }
+    }
+
+    // ── Poll server every 5 s ────────────────────────────────────────────
+    async function poll() {
+      try {
+        const res   = await fetch('/api/state');
+        const state = await res.json();
+        applyState(state);
+      } catch (e) { /* network blip, ignore */ }
+    }
+
+    // ── Start button ─────────────────────────────────────────────────────
+    startBtn.addEventListener('click', async () => {
+      startBtn.disabled = true;
+      try {
+        const res   = await fetch('/api/start', { method: 'POST' });
+        const body  = await res.json();
+        if (res.ok) {
+          applyState(body.data);
+        } else {
+          alert(body.error || 'Could not start timer.');
+          startBtn.disabled = false;
+        }
+      } catch (e) {
+        alert('Server error.');
+        startBtn.disabled = false;
+      }
+    });
+
+    // ── Init ─────────────────────────────────────────────────────────────
+    poll();
+    pollInterval = setInterval(poll, 5000);
+  </script>
+</body>
+</html>
